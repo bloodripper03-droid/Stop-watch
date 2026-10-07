@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limbo Countdown Timer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cinzel', serif;
+            background-color: #030303;
+            color: #d1d5db;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .digital-font {
+            font-family: 'VT323', monospace;
+        }
+
+        /* Ambient Fog and Mist Layers */
+        .fog-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(20,20,20,0) 0%, rgba(255,255,255,0.06) 50%, rgba(20,20,20,0) 100%);
+            animation: moveFog 28s linear infinite;
+            pointer-events: none;
+        }
+
+        .fog-layer-reverse {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(255,255,255,0.04) 40%, rgba(0,0,0,0) 100%);
+            animation: moveFogReverse 38s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes moveFog {
+            0% { transform: translateX(-50%); }
+            100% { transform: translateX(0%); }
+        }
+
+        @keyframes moveFogReverse {
+            0% { transform: translateX(0%); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* Screen Vignette */
+        .vignette {
+            position: fixed;
+            inset: 0;
+            box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.95);
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* Particle Dust */
+        #dust-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Glowing Silhouette Eyes */
+        .glowing-eyes {
+            box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.9);
+        }
+
+        /* Camera Shake on Time Up */
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both infinite;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, -1px, 0); }
+            20%, 80% { transform: translate3d(3px, 1px, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, -2px, 0); }
+            40%, 60% { transform: translate3d(4px, 2px, 0); }
+        }
+
+        /* Pulsing Glow Effect */
+        .time-pulse {
+            animation: timePulse 1s ease-out;
+        }
+
+        @keyframes timePulse {
+            0% { text-shadow: 0 0 25px rgba(255, 255, 255, 0.8); transform: scale(1.02); }
+            100% { text-shadow: 0 0 0px rgba(255, 255, 255, 0); transform: scale(1); }
+        }
+
+        /* Custom Scrollbar for Code Preview Modal */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen relative flex flex-col justify-between items-center bg-black text-gray-200 overflow-hidden">
+
+    <!-- Ambient Fog Overlay -->
+    <div class="fog-layer"></div>
+    <div class="fog-layer-reverse"></div>
+    <div class="vignette"></div>
+
+    <!-- Particle Canvas -->
+    <canvas id="dust-canvas"></canvas>
+
+    <!-- Top Navigation / Title Header -->
+    <header class="z-30 w-full max-w-5xl px-6 pt-6 flex justify-between items-center text-xs tracking-widest uppercase opacity-70">
+        <div class="flex items-center space-x-2">
+            <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+            <span>Limbo Engine v1.0</span>
+        </div>
+        <button id="toggle-code-btn" class="hover:text-white transition duration-300 border border-neutral-700 px-3 py-1 rounded bg-black/40 hover:bg-neutral-800">
+            View Source Code
+        </button>
+    </header>
+
+    <!-- Main Content Box -->
+    <main id="main-container" class="z-30 flex flex-col items-center justify-center max-w-xl w-full px-4 my-auto text-center transition-all duration-300">
+        
+        <!-- Mysterious Eyes Silhouette -->
+        <div class="flex items-center space-x-3 mb-6 opacity-80">
+            <div id="eye-left" class="w-2.5 h-2.5 bg-white rounded-full glowing-eyes transition-all duration-500"></div>
+            <div id="eye-right" class="w-2.5 h-2.5 bg-white rounded-full glowing-eyes transition-all duration-500"></div>
+        </div>
+
+        <!-- Main Timer Card -->
+        <div class="bg-neutral-950/80 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-8 shadow-2xl w-full relative overflow-hidden">
+            <div class="absolute -top-12 -left-12 w-24 h-24 bg-white/5 rounded-full filter blur-xl"></div>
+            
+            <h1 class="text-sm tracking-[0.3em] uppercase text-neutral-400 mb-2 font-semibold">Atmospheric Countdown</h1>
+            
+            <!-- Live Time Display -->
+            <div id="timer-display-container" class="my-6">
+                <div id="timer-text" class="text-6xl sm:text-7xl font-bold tracking-wider text-neutral-100 digital-font transition-all duration-200">
+                    00:00
+                </div>
+                <div id="timer-status" class="text-xs uppercase tracking-[0.2em] text-neutral-500 mt-2">
+                    Time Left: <span id="seconds-text" class="text-neutral-300">0</span> seconds
+                </div>
+            </div>
+
+            <!-- Input and Controls -->
+            <div id="controls-section" class="flex flex-col space-y-4">
+                <div class="flex items-center justify-center space-x-2">
+                    <div class="relative w-full max-w-xs">
+                        <input 
+                            type="number" 
+                            id="seconds-input" 
+                            min="1" 
+                            max="99999"
+                            placeholder="Start time in seconds..."
+                            class="w-full bg-neutral-900/90 border border-neutral-700 text-center text-neutral-200 px-4 py-3 rounded-lg focus:outline-none focus:border-neutral-400 transition placeholder-neutral-600 text-sm tracking-wider"
+                        />
+                        <span class="absolute right-3 top-3.5 text-xs text-neutral-500">sec</span>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-center items-center space-x-3 pt-2">
+                    <button id="start-btn" class="flex-1 bg-neutral-200 hover:bg-white text-black font-semibold text-xs tracking-widest uppercase py-3 px-6 rounded-lg transition duration-300 shadow-lg hover:shadow-white/10 active:scale-95">
+                        Start
+                    </button>
+                    <button id="pause-btn" disabled class="flex-1 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 font-semibold text-xs tracking-widest uppercase py-3 px-6 rounded-lg transition duration-300 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95">
+                        Pause
+                    </button>
+                    <button id="reset-btn" class="bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 font-semibold text-xs tracking-widest uppercase p-3 rounded-lg transition duration-300 active:scale-95">
+                        Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Silhouette Ground & Trees Background -->
+    <div class="w-full relative z-10 pointer-events-none flex flex-col items-center">
+        <!-- SVG Silhouettes of Limbo Forest Elements -->
+        <svg class="w-full h-32 sm:h-48 text-black fill-current -mb-1" viewBox="0 0 1200 200" preserveAspectRatio="none">
+            <!-- Background Spikes & Sharp Trees -->
+            <path d="M0,200 L0,120 L30,160 L70,80 L110,170 L150,110 L190,190 L240,70 L280,180 L330,90 L380,170 L420,100 L470,190 L520,60 L570,180 L620,110 L680,190 L730,80 L790,170 L840,90 L890,180 L940,110 L990,190 L1050,70 L1100,160 L1150,100 L1200,200 Z" opacity="0.4" />
+            <!-- Foreground Sharp Terrain -->
+            <path d="M0,200 L0,150 L50,130 L100,160 L180,110 L250,170 L320,120 L400,160 L480,100 L550,150 L630,90 L710,160 L800,110 L880,170 L960,130 L1040,160 L1120,120 L1200,150 L1200,200 Z" />
+            <!-- Lone Boy Silhouette Placeholder Structure -->
+            <rect x="590" y="125" width="6" height="25" rx="2" fill="#000000" />
+            <circle cx="593" cy="120" r="5" fill="#000000" />
+        </svg>
+        <div class="w-full h-8 bg-black"></div>
+    </div>
+
+    <!-- Python Code View Modal -->
+    <div id="code-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-neutral-950 border border-neutral-800 rounded-xl max-w-2xl w-full p-6 text-left relative shadow-2xl">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-neutral-800">
+                <h3 class="text-sm tracking-wider uppercase font-bold text-neutral-300">Python Source Equivalent</h3>
+                <button id="close-modal-btn" class="text-neutral-500 hover:text-white transition">✕</button>
+            </div>
+            <pre class="bg-neutral-900/90 text-neutral-300 p-4 rounded-lg font-mono text-xs overflow-x-auto border border-neutral-800"><code>import time
+
+seconds = int(input('start time in seconds: '))
+
+while seconds > 0:
+    print('Time Left :', seconds)
+    time.sleep(1)
+    seconds -= 1
+
+print('Time Up')</code></pre>
+            <div class="mt-4 flex justify-end">
+                <button id="copy-code-btn" class="bg-neutral-800 hover:bg-neutral-700 text-xs px-4 py-2 rounded text-neutral-300 transition">
+                    Copy Code
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State Variables
+        let timerInterval = null;
+        let totalSeconds = 0;
+        let remainingSeconds = 0;
+        let isRunning = false;
+
+        // DOM Elements
+        const secondsInput = document.getElementById('seconds-input');
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const timerText = document.getElementById('timer-text');
+        const secondsText = document.getElementById('seconds-text');
+        const timerStatus = document.getElementById('timer-status');
+        const eyeLeft = document.getElementById('eye-left');
+        const eyeRight = document.getElementById('eye-right');
+        const mainContainer = document.getElementById('main-container');
+
+        // Modal Elements
+        const codeModal = document.getElementById('code-modal');
+        const toggleCodeBtn = document.getElementById('toggle-code-btn');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const copyCodeBtn = document.getElementById('copy-code-btn');
+
+        // Audio Effects using Web Audio API
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playTickSound() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.05);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+
+        function playTimeUpSound() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(80, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 1.2);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 1.2);
+        }
+
+        // Format Seconds into MM:SS
+        function formatTime(secs) {
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Update UI Display
+        function updateDisplay() {
+            timerText.innerText = formatTime(remainingSeconds);
+            secondsText.innerText = remainingSeconds;
+            
+            // Add pulse visual effect on tick
+            timerText.classList.remove('time-pulse');
+            void timerText.offsetWidth; // Trigger reflow
+            timerText.classList.add('time-pulse');
+        }
+
+        // Timer Tick logic
+        function tick() {
+            if (remainingSeconds > 0) {
+                remainingSeconds--;
+                updateDisplay();
+                playTickSound();
+            } else {
+                triggerTimeUp();
+            }
+        }
+
+        // Start Countdown Timer
+        function startTimer() {
+            if (isRunning) return;
+
+            if (remainingSeconds <= 0) {
+                const val = parseInt(secondsInput.value);
+                if (isNaN(val) || val <= 0) {
+                    secondsInput.classList.add('border-red-500');
+                    setTimeout(() => secondsInput.classList.remove('border-red-500'), 1000);
+                    return;
+                }
+                totalSeconds = val;
+                remainingSeconds = val;
+            }
+
+            isRunning = true;
+            startBtn.innerText = 'Running';
+            startBtn.disabled = true;
+            startBtn.classList.add('opacity-50');
+            pauseBtn.disabled = false;
+            secondsInput.disabled = true;
+
+            // Reset Eyes
+            eyeLeft.style.backgroundColor = '#ffffff';
+            eyeRight.style.backgroundColor = '#ffffff';
+            mainContainer.classList.remove('shake');
+
+            updateDisplay();
+            timerInterval = setInterval(tick, 1000);
+        }
+
+        // Pause Timer
+        function pauseTimer() {
+            if (!isRunning) return;
+            clearInterval(timerInterval);
+            isRunning = false;
+            startBtn.innerText = 'Resume';
+            startBtn.disabled = false;
+            startBtn.classList.remove('opacity-50');
+            pauseBtn.disabled = true;
+        }
+
+        // Reset Timer
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            remainingSeconds = 0;
+            totalSeconds = 0;
+            
+            timerText.innerText = '00:00';
+            secondsText.innerText = '0';
+            secondsInput.value = '';
+            secondsInput.disabled = false;
+
+            startBtn.innerText = 'Start';
+            startBtn.disabled = false;
+            startBtn.classList.remove('opacity-50');
+            pauseBtn.disabled = true;
+
+            eyeLeft.style.backgroundColor = '#ffffff';
+            eyeRight.style.backgroundColor = '#ffffff';
+            mainContainer.classList.remove('shake');
+            timerStatus.innerHTML = 'Time Left: <span id="seconds-text" class="text-neutral-300">0</span> seconds';
+        }
+
+        // Dramatic Finish Effect on Time Up
+        function triggerTimeUp() {
+            clearInterval(timerInterval);
+            isRunning = false;
+
+            timerText.innerText = '00:00';
+            secondsText.innerText = '0';
+            timerStatus.innerHTML = '<span class="text-red-500 font-bold tracking-widest animate-pulse">TIME UP</span>';
+
+            // Eerie Red Eyes Effect
+            eyeLeft.style.backgroundColor = '#ef4444';
+            eyeRight.style.backgroundColor = '#ef4444';
+
+            // Camera/UI Shake Effect
+            mainContainer.classList.add('shake');
+            playTimeUpSound();
+
+            startBtn.innerText = 'Start';
+            startBtn.disabled = false;
+            startBtn.classList.remove('opacity-50');
+            pauseBtn.disabled = true;
+            secondsInput.disabled = false;
+        }
+
+        // Event Listeners
+        startBtn.addEventListener('click', startTimer);
+        pauseBtn.addEventListener('click', pauseTimer);
+        resetBtn.addEventListener('click', resetTimer);
+
+        secondsInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                startTimer();
+            }
+        });
+
+        // Code Modal Logic
+        toggleCodeBtn.addEventListener('click', () => {
+            codeModal.classList.remove('opacity-0', 'pointer-events-none');
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            codeModal.classList.add('opacity-0', 'pointer-events-none');
+        });
+
+        copyCodeBtn.addEventListener('click', () => {
+            const codeText = `import time\n\nseconds = int(input('start time in seconds: '))\n\nwhile seconds > 0:\n    print('Time Left :', seconds)\n    time.sleep(1)\n    seconds -= 1\n\nprint('Time Up')`;
+            navigator.clipboard.writeText(codeText).then(() => {
+                copyCodeBtn.innerText = 'Copied!';
+                setTimeout(() => copyCodeBtn.innerText = 'Copy Code', 2000);
+            });
+        });
+
+        // Ambient Particle Dust System
+        const canvas = document.getElementById('dust-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const particles = Array.from({ length: 65 }, () => ({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: Math.random() * 2 + 0.5,
+            speedX: (Math.random() - 0.5) * 0.3,
+            speedY: (Math.random() - 0.5) * 0.3,
+            opacity: Math.random() * 0.5 + 0.1
+        }));
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            particles.forEach(p => {
+                p.x += p.speedX;
+                p.y += p.speedY;
+
+                if (p.x < 0) p.x = canvas.width;
+                if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height;
+                if (p.y > canvas.height) p.y = 0;
+
+                ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+    </script>
+</body>
+</html>
